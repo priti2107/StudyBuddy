@@ -2,16 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 interface User {
-  id: number;
-  name: string;
   email: string;
-  avatar: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string) => Promise<boolean>;
+  signup: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
 }
@@ -21,6 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
+  // Load user if stored
   useEffect(() => {
     const storedUser = localStorage.getItem('studybuddy_user');
     if (storedUser) {
@@ -28,66 +26,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const signup = async (name: string, email: string, password: string): Promise<boolean> => {
-    const users = JSON.parse(localStorage.getItem('studybuddy_users') || '[]');
-    
-    if (users.find((u: any) => u.email === email)) {
-      toast.error('Email already registered');
+  /* ----------------------------------------------------
+     SIGNUP → Django (email + password)
+  ---------------------------------------------------- */
+  const signup = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/auth/signup/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        toast.error(err.error || "Signup failed");
+        return false;
+      }
+
+      toast.success("Account created successfully! Please log in.");
+      return true;
+
+    } catch (err) {
+      toast.error("Signup error");
       return false;
     }
-
-    const newUser: User = {
-      id: Date.now(),
-      name,
-      email,
-      avatar: null,
-    };
-
-    users.push({ ...newUser, password });
-    localStorage.setItem('studybuddy_users', JSON.stringify(users));
-    localStorage.setItem('studybuddy_user', JSON.stringify(newUser));
-    setUser(newUser);
-    toast.success('Account created successfully!');
-    return true;
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const users = JSON.parse(localStorage.getItem('studybuddy_users') || '[]');
-    const foundUser = users.find((u: any) => u.email === email && u.password === password);
+  /* ----------------------------------------------------
+     LOGIN → Django JWT (email + password)
+  ---------------------------------------------------- */
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/auth/login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!foundUser) {
-      toast.error('Invalid email or password');
+      if (!response.ok) {
+        toast.error("Invalid email or password");
+        return false;
+      }
+
+      const data = await response.json();
+
+      // Store tokens
+      localStorage.setItem("accessToken", data.access);
+      localStorage.setItem("refreshToken", data.refresh);
+
+      // Store user info
+      const newUser = { email };
+      setUser(newUser);
+      localStorage.setItem("studybuddy_user", JSON.stringify(newUser));
+
+      toast.success("Welcome back!");
+      return true;
+
+    } catch (err) {
+      toast.error("Login error");
       return false;
     }
-
-    const { password: _, ...userWithoutPassword } = foundUser;
-    localStorage.setItem('studybuddy_user', JSON.stringify(userWithoutPassword));
-    setUser(userWithoutPassword);
-    toast.success('Welcome back!');
-    return true;
   };
 
+  /* ----------------------------------------------------
+     LOGOUT
+  ---------------------------------------------------- */
   const logout = () => {
-    localStorage.removeItem('studybuddy_user');
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("studybuddy_user");
     setUser(null);
-    toast.success('Logged out successfully');
+    toast.success("Logged out successfully");
   };
 
+  /* ----------------------------------------------------
+     UPDATE USER (Optional)
+  ---------------------------------------------------- */
   const updateUser = (updates: Partial<User>) => {
     if (!user) return;
-    
+
     const updatedUser = { ...user, ...updates };
     setUser(updatedUser);
-    localStorage.setItem('studybuddy_user', JSON.stringify(updatedUser));
-    
-    const users = JSON.parse(localStorage.getItem('studybuddy_users') || '[]');
-    const userIndex = users.findIndex((u: any) => u.id === user.id);
-    if (userIndex !== -1) {
-      users[userIndex] = { ...users[userIndex], ...updates };
-      localStorage.setItem('studybuddy_users', JSON.stringify(users));
-    }
-    
-    toast.success('Profile updated successfully');
+    localStorage.setItem("studybuddy_user", JSON.stringify(updatedUser));
+
+    toast.success("Profile updated");
   };
 
   return (
@@ -99,8 +121,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
