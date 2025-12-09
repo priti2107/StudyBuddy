@@ -3,9 +3,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { addSubject, updateSubject } from '@/lib/storage';
-import { Subject, SUBJECT_COLORS } from '@/lib/mockData';
 import { toast } from 'sonner';
+import { SUBJECT_COLORS } from '@/lib/mockData';
+
+const API_BASE = "http://127.0.0.1:8000";
+
+interface Subject {
+  id?: number;
+  name: string;
+  code: string;
+  instructor: string;
+  schedule: string;
+  color: string;
+  notes?: string;
+}
 
 interface SubjectFormProps {
   subject?: Subject | null;
@@ -13,11 +24,10 @@ interface SubjectFormProps {
 }
 
 export const SubjectForm = ({ subject, onClose }: SubjectFormProps) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Subject>({
     name: subject?.name || '',
     code: subject?.code || '',
     color: subject?.color || SUBJECT_COLORS[0],
-    semester: subject?.semester || '',
     instructor: subject?.instructor || '',
     schedule: subject?.schedule || '',
     notes: subject?.notes || '',
@@ -36,20 +46,47 @@ export const SubjectForm = ({ subject, onClose }: SubjectFormProps) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!validate()) return;
 
-    if (subject) {
-      updateSubject(subject.id, formData);
-      toast.success('Subject updated successfully');
-    } else {
-      addSubject(formData);
-      toast.success('Subject added successfully');
-    }
+    const token = localStorage.getItem("accessToken");
 
-    onClose();
+    try {
+      if (subject?.id) {
+        // ✅ UPDATE (PUT)
+        const res = await fetch(`${API_BASE}/api/subjects/${subject.id}/`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!res.ok) throw new Error("Update failed");
+
+        toast.success("Subject updated successfully");
+      } else {
+        // ✅ CREATE (POST)
+        const res = await fetch(`${API_BASE}/api/subjects/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!res.ok) throw new Error("Create failed");
+
+        toast.success("Subject added successfully");
+      }
+
+      onClose();
+    } catch (err) {
+      toast.error("Failed to save subject");
+    }
   };
 
   return (
@@ -97,16 +134,6 @@ export const SubjectForm = ({ subject, onClose }: SubjectFormProps) => {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="semester">Semester/Term</Label>
-          <Input
-            id="semester"
-            value={formData.semester}
-            onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-            placeholder="e.g., Fall 2024"
-          />
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="instructor">Instructor</Label>
           <Input
             id="instructor"
@@ -115,16 +142,16 @@ export const SubjectForm = ({ subject, onClose }: SubjectFormProps) => {
             placeholder="e.g., Dr. Smith"
           />
         </div>
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="schedule">Class Schedule</Label>
-        <Input
-          id="schedule"
-          value={formData.schedule}
-          onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
-          placeholder="e.g., Mon/Wed 10:00 AM"
-        />
+        <div className="space-y-2">
+          <Label htmlFor="schedule">Class Schedule</Label>
+          <Input
+            id="schedule"
+            value={formData.schedule}
+            onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+            placeholder="e.g., Mon/Wed 10:00 AM"
+          />
+        </div>
       </div>
 
       <div className="space-y-2">

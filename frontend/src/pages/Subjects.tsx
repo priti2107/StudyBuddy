@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, BookOpen, Edit, Trash2 } from 'lucide-react';
-import { getSubjects, getTasks, deleteSubject } from '@/lib/storage';
-import { Subject } from '@/lib/mockData';
 import { EmptyState } from '@/components/EmptyState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SubjectForm } from '@/components/SubjectForm';
@@ -20,6 +18,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import { fetchSubjects, deleteSubjectAPI } from '@/lib/api';
+
+// ✅ backend-compatible subject type
+interface Subject {
+  id: number;
+  name: string;
+  code: string;
+  instructor: string;
+  schedule: string;
+  color: string;
+}
+
 const Subjects = () => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [showDialog, setShowDialog] = useState(false);
@@ -27,18 +37,19 @@ const Subjects = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<Subject | null>(null);
   const navigate = useNavigate();
 
-  const loadSubjects = () => {
-    setSubjects(getSubjects());
+  // ✅ LOAD FROM BACKEND
+  const loadSubjects = async () => {
+    try {
+      const data = await fetchSubjects();
+      setSubjects(data);
+    } catch (err) {
+      toast.error("Failed to load subjects");
+    }
   };
 
   useEffect(() => {
     loadSubjects();
   }, []);
-
-  const getPendingTasksCount = (subjectId: number) => {
-    const tasks = getTasks();
-    return tasks.filter(t => t.subjectId === subjectId && t.status !== 'completed').length;
-  };
 
   const handleEdit = (subject: Subject) => {
     setEditingSubject(subject);
@@ -49,11 +60,17 @@ const Subjects = () => {
     setDeleteConfirm(subject);
   };
 
-  const confirmDelete = () => {
-    if (deleteConfirm) {
-      deleteSubject(deleteConfirm.id);
-      toast.success('Subject deleted successfully');
+  // ✅ DELETE FROM BACKEND
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+
+    try {
+      await deleteSubjectAPI(deleteConfirm.id);
+      toast.success("Subject deleted");
       loadSubjects();
+    } catch (err) {
+      toast.error("Delete failed");
+    } finally {
       setDeleteConfirm(null);
     }
   };
@@ -61,7 +78,7 @@ const Subjects = () => {
   const handleDialogClose = () => {
     setShowDialog(false);
     setEditingSubject(null);
-    loadSubjects();
+    loadSubjects(); // ✅ reload after add/edit
   };
 
   return (
@@ -129,10 +146,6 @@ const Subjects = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Pending Tasks</span>
-                  <span className="font-semibold">{getPendingTasksCount(subject.id)}</span>
-                </div>
                 <div className="text-sm">
                   <p className="text-muted-foreground mb-1">Instructor</p>
                   <p className="font-medium">{subject.instructor}</p>
@@ -152,6 +165,8 @@ const Subjects = () => {
           <DialogHeader>
             <DialogTitle>{editingSubject ? 'Edit Subject' : 'Add New Subject'}</DialogTitle>
           </DialogHeader>
+
+          {/* ✅ YOU WILL CONNECT THIS NEXT */}
           <SubjectForm subject={editingSubject} onClose={handleDialogClose} />
         </DialogContent>
       </Dialog>
@@ -161,7 +176,7 @@ const Subjects = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the subject "{deleteConfirm?.name}" and all associated tasks. This action cannot be undone.
+              This will permanently delete the subject "{deleteConfirm?.name}". This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
