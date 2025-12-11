@@ -1,145 +1,137 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { addTask, updateTask, getSubjects } from '@/lib/storage';
-import { Task } from '@/lib/mockData';
-import { toast } from 'sonner';
+} from "@/components/ui/select";
+import { fetchSubjects, createTaskAPI, updateTaskAPI } from "@/lib/api";
+import { toast } from "sonner";
 
 interface TaskFormProps {
-  task?: Task | null;
+  task?: any;
   onClose: () => void;
 }
 
 export const TaskForm = ({ task, onClose }: TaskFormProps) => {
-  const subjects = getSubjects();
+  const [subjects, setSubjects] = useState<any[]>([]);
+
   const [formData, setFormData] = useState({
-    subjectId: task?.subjectId || subjects[0]?.id || 0,
-    title: task?.title || '',
-    description: task?.description || '',
-    deadline: task?.deadline?.slice(0, 16) || '',
-    priority: task?.priority || 'medium',
-    status: task?.status || 'todo',
+    title: task?.title || "",
+    description: task?.description || "",
+    deadline: task?.deadline?.slice(0, 16) || "",
+    subject: task?.subject || "",
+    priority: task?.priority || "medium",
+    status: task?.status || "todo",
     estimatedTime: task?.estimatedTime || 1,
     actualTime: task?.actualTime || 0,
-    tags: task?.tags?.join(', ') || '',
+    tags: task?.tags?.join(", ") || "",
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    fetchSubjects().then(setSubjects);
+  }, []);
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    }
-
-    if (!formData.deadline) {
-      newErrors.deadline = 'Deadline is required';
-    }
-
-    if (!formData.subjectId) {
-      newErrors.subjectId = 'Please select a subject';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
 
-    if (!validate()) return;
-
-    const taskData = {
-      ...formData,
-      tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
+    const payload = {
+      title: formData.title,
+      description: formData.description,
+      deadline: formData.deadline,
+      priority: formData.priority,
+      status: formData.status,
+      subject: formData.subject,
     };
 
-    if (task) {
-      updateTask(task.id, taskData);
-      toast.success('Task updated successfully');
-    } else {
-      addTask(taskData);
-      toast.success('Task added successfully');
+    try {
+      if (task) {
+        await updateTaskAPI(task.id, payload);
+        toast.success("Task updated");
+      } else {
+        await createTaskAPI(payload);
+        toast.success("Task added");
+      }
+      onClose();
+    } catch (err) {
+      toast.error("Failed to save task");
     }
-
-    onClose();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
+
+      {/* TITLE */}
       <div className="space-y-2">
-        <Label htmlFor="title">Title *</Label>
+        <Label>Title *</Label>
         <Input
-          id="title"
+          placeholder="e.g., Complete Binary Tree Assignment"
           value={formData.title}
           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          placeholder="e.g., Complete Binary Tree Assignment"
-          className={errors.title ? 'border-destructive' : ''}
         />
-        {errors.title && <p className="text-sm text-destructive">{errors.title}</p>}
       </div>
 
+      {/* DESCRIPTION */}
       <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+        <Label>Description</Label>
         <Textarea
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder="Add details about the task..."
-          rows={3}
+          value={formData.description}
+          onChange={(e) =>
+            setFormData({ ...formData, description: e.target.value })
+          }
         />
       </div>
 
+      {/* SUBJECT + DEADLINE */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="subject">Subject *</Label>
+          <Label>Subject *</Label>
           <Select
-            value={formData.subjectId.toString()}
-            onValueChange={(value) => setFormData({ ...formData, subjectId: parseInt(value) })}
+            value={formData.subject?.toString()}
+            onValueChange={(v) =>
+              setFormData({ ...formData, subject: parseInt(v) })
+            }
           >
-            <SelectTrigger className={errors.subjectId ? 'border-destructive' : ''}>
+            <SelectTrigger>
               <SelectValue placeholder="Select subject" />
             </SelectTrigger>
             <SelectContent>
-              {subjects.map(subject => (
-                <SelectItem key={subject.id} value={subject.id.toString()}>
-                  {subject.name} ({subject.code})
+              {subjects.map((s) => (
+                <SelectItem key={s.id} value={s.id.toString()}>
+                  {s.name} ({s.code})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {errors.subjectId && <p className="text-sm text-destructive">{errors.subjectId}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="deadline">Deadline *</Label>
+          <Label>Deadline *</Label>
           <Input
-            id="deadline"
             type="datetime-local"
             value={formData.deadline}
-            onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-            className={errors.deadline ? 'border-destructive' : ''}
+            onChange={(e) =>
+              setFormData({ ...formData, deadline: e.target.value })
+            }
           />
-          {errors.deadline && <p className="text-sm text-destructive">{errors.deadline}</p>}
         </div>
       </div>
 
+      {/* PRIORITY + STATUS */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="priority">Priority</Label>
+          <Label>Priority</Label>
           <Select
             value={formData.priority}
-            onValueChange={(value: any) => setFormData({ ...formData, priority: value })}
+            onValueChange={(v) =>
+              setFormData({ ...formData, priority: v })
+            }
           >
             <SelectTrigger>
               <SelectValue />
@@ -153,10 +145,12 @@ export const TaskForm = ({ task, onClose }: TaskFormProps) => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="status">Status</Label>
+          <Label>Status</Label>
           <Select
             value={formData.status}
-            onValueChange={(value: any) => setFormData({ ...formData, status: value })}
+            onValueChange={(v) =>
+              setFormData({ ...formData, status: v })
+            }
           >
             <SelectTrigger>
               <SelectValue />
@@ -170,49 +164,59 @@ export const TaskForm = ({ task, onClose }: TaskFormProps) => {
         </div>
       </div>
 
+      {/* TIME FIELDS */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="estimatedTime">Estimated Time (hours)</Label>
+          <Label>Estimated Time (hours)</Label>
           <Input
-            id="estimatedTime"
             type="number"
             min="0"
             step="0.5"
             value={formData.estimatedTime}
-            onChange={(e) => setFormData({ ...formData, estimatedTime: parseFloat(e.target.value) })}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                estimatedTime: parseFloat(e.target.value),
+              })
+            }
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="actualTime">Actual Time (hours)</Label>
+          <Label>Actual Time (hours)</Label>
           <Input
-            id="actualTime"
             type="number"
             min="0"
             step="0.5"
             value={formData.actualTime}
-            onChange={(e) => setFormData({ ...formData, actualTime: parseFloat(e.target.value) })}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                actualTime: parseFloat(e.target.value),
+              })
+            }
           />
         </div>
       </div>
 
+      {/* TAGS */}
       <div className="space-y-2">
-        <Label htmlFor="tags">Tags (comma-separated)</Label>
+        <Label>Tags (comma-separated)</Label>
         <Input
-          id="tags"
-          value={formData.tags}
-          onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
           placeholder="e.g., assignment, coding, urgent"
+          value={formData.tags}
+          onChange={(e) =>
+            setFormData({ ...formData, tags: e.target.value })
+          }
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onClose}>
+      {/* ACTION BUTTONS */}
+      <div className="flex justify-end gap-3 pt-4">
+        <Button variant="outline" type="button" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit">
-          {task ? 'Update' : 'Add'} Task
-        </Button>
+        <Button type="submit">{task ? "Update Task" : "Add Task"}</Button>
       </div>
     </form>
   );
