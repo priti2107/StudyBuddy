@@ -74,7 +74,7 @@ const Settings = () => {
         <CardContent className="space-y-6">
           <div className="flex items-center gap-6">
             <Avatar className="h-20 w-20">
-              <AvatarFallback className="text-2xl bg-gradient-hero text-white">
+              <AvatarFallback className="text-2xl bg-primary text-white">
                 {user ? getInitials(user.name) : 'U'}
               </AvatarFallback>
             </Avatar>
@@ -106,7 +106,7 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      {/* Appearance Section */}
+      {/* Appearance */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -148,13 +148,15 @@ const Settings = () => {
             <AlertDialogTrigger asChild>
               <Button variant="destructive">Delete Account</Button>
             </AlertDialogTrigger>
+
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete your account and remove all your data including subjects, tasks, and resources.
+                  This action will permanently delete your entire account and all your data.
                 </AlertDialogDescription>
               </AlertDialogHeader>
+
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
@@ -165,6 +167,7 @@ const Settings = () => {
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
+
           </AlertDialog>
         </CardContent>
       </Card>

@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
-interface User {
+/* ---------------------------------------------------
+   UPDATED USER TYPE → Fixes your "name does not exist" errors
+--------------------------------------------------- */
+export interface User {
+  name: string;
   email: string;
 }
 
@@ -18,7 +22,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
-  // Load user if stored
+  /* ---------------------------------------------------
+     LOAD USER FROM LOCALSTORAGE
+  --------------------------------------------------- */
   useEffect(() => {
     const storedUser = localStorage.getItem('studybuddy_user');
     if (storedUser) {
@@ -26,9 +32,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  /* ----------------------------------------------------
-     SIGNUP → Django (email + password)
-  ---------------------------------------------------- */
+  /* ---------------------------------------------------
+     SIGNUP → Django API
+  --------------------------------------------------- */
   const signup = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await fetch("http://127.0.0.1:8000/api/auth/signup/", {
@@ -52,10 +58,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  /* ----------------------------------------------------
-     LOGIN → Django JWT (email + password)
-  ---------------------------------------------------- */
-  const login = async (email: string, password: string) => {
+  /* ---------------------------------------------------
+     LOGIN → Django JWT
+  --------------------------------------------------- */
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await fetch("http://127.0.0.1:8000/api/auth/login/", {
         method: "POST",
@@ -70,12 +76,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await response.json();
 
-      // Store tokens
       localStorage.setItem("accessToken", data.access);
       localStorage.setItem("refreshToken", data.refresh);
 
-      // Store user info
-      const newUser = { email };
+      // NEW USER OBJECT (includes name)
+      const newUser: User = {
+        name: email.split("@")[0], // temporary name until user edits
+        email
+      };
+
       setUser(newUser);
       localStorage.setItem("studybuddy_user", JSON.stringify(newUser));
 
@@ -88,9 +97,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  /* ----------------------------------------------------
+  /* ---------------------------------------------------
      LOGOUT
-  ---------------------------------------------------- */
+  --------------------------------------------------- */
   const logout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
@@ -99,13 +108,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success("Logged out successfully");
   };
 
-  /* ----------------------------------------------------
-     UPDATE USER (Optional)
-  ---------------------------------------------------- */
+  /* ---------------------------------------------------
+     UPDATE USER (Profile Settings Page)
+     Fixes both TS errors you posted.
+  --------------------------------------------------- */
   const updateUser = (updates: Partial<User>) => {
     if (!user) return;
 
-    const updatedUser = { ...user, ...updates };
+    const updatedUser: User = { ...user, ...updates };
+
     setUser(updatedUser);
     localStorage.setItem("studybuddy_user", JSON.stringify(updatedUser));
 
